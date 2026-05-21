@@ -234,12 +234,78 @@ function App() {
       } else {
         // Mock data for demo mode
         setProducts([
-          { id: 'p1', title_uz: 'Osh (Palov)', title_ru: 'Плов', title_en: 'Pilaf (Osh)', price: 35000, category: 'national', image_url: 'https://images.unsplash.com/photo-1541832676-9b763b0239ab?q=80&w=600&auto=format&fit=crop' },
-          { id: 'p2', title_uz: 'Lag\'mon', title_ru: 'Лагман', title_en: 'Lagman', price: 28000, category: 'national', image_url: 'https://images.unsplash.com/photo-1585032226651-759b368d7246?q=80&w=600&auto=format&fit=crop' },
-          { id: 'p3', title_uz: 'Somsa (Go\'shtli)', title_ru: 'Самса с мясом', title_en: 'Meat Somsa', price: 10000, category: 'national', image_url: 'https://images.unsplash.com/photo-1601050690597-df056fb4ce78?q=80&w=600&auto=format&fit=crop' },
-          { id: 'p4', title_uz: 'Ko\'k choy', title_ru: 'Зеленый чай', title_en: 'Green Tea', price: 5000, category: 'drinks', image_url: 'https://images.unsplash.com/photo-1597481499750-3e6b22637e12?q=80&w=600&auto=format&fit=crop' },
-          { id: 'p5', title_uz: 'Limonad', title_ru: 'Лимонад', title_en: 'Lemonade', price: 15000, category: 'drinks', image_url: 'https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?q=80&w=600&auto=format&fit=crop' },
-          { id: 'p6', title_uz: 'Medovik', title_ru: 'Медовик', title_en: 'Honey Cake', price: 20000, category: 'dessert', image_url: 'https://images.unsplash.com/photo-1606313564200-e75d5e30476c?q=80&w=600&auto=format&fit=crop' }
+          { 
+            id: 'p1', 
+            title_uz: 'Osh (Palov)', 
+            title_ru: 'Плов', 
+            title_en: 'Pilaf (Osh)', 
+            description_uz: 'Mol go\'shti, guruch, sabzi va maxsus ziravorlar bilan pishirilgan milliy palov.',
+            description_ru: 'Национальный плов, приготовленный с говядиной, рисом, морковью и особыми специями.',
+            description_en: 'National pilaf cooked with beef, rice, carrots, and special spices.',
+            price: 35000, 
+            category: 'national', 
+            image_url: 'https://images.unsplash.com/photo-1541832676-9b763b0239ab?q=80&w=600&auto=format&fit=crop' 
+          },
+          { 
+            id: 'p2', 
+            title_uz: 'Lag\'mon', 
+            title_ru: 'Лагман', 
+            title_en: 'Lagman', 
+            description_uz: 'Qo\'lda cho\'zilgan xamir, yangi sabzavotlar va mol go\'shtidan tayyorlangan quyuq lag\'mon sho\'rva.',
+            description_ru: 'Густой суп лагман из тянутой вручную лапши, свежих овощей и говядины.',
+            description_en: 'Thick lagman soup made with hand-pulled noodles, fresh vegetables, and beef.',
+            price: 28000, 
+            category: 'national', 
+            image_url: 'https://images.unsplash.com/photo-1585032226651-759b368d7246?q=80&w=600&auto=format&fit=crop' 
+          },
+          { 
+            id: 'p3', 
+            title_uz: 'Somsa (Go\'shtli)', 
+            title_ru: 'Самса с мясом', 
+            title_en: 'Meat Somsa', 
+            description_uz: 'Tandirda pishirilgan, ichida to\'g\'ralgan mol go\'shti va piyoz bo\'lgan qarsillaydigan milliy somsa.',
+            description_ru: 'Хрустящая национальная самса, запеченная в тандыре, с начинкой из рубленой говядины и лука.',
+            description_en: 'Crispy national somsa baked in a tandoor, filled with minced beef and onions.',
+            price: 10000, 
+            category: 'national', 
+            image_url: 'https://images.unsplash.com/photo-1601050690597-df056fb4ce78?q=80&w=600&auto=format&fit=crop' 
+          },
+          { 
+            id: 'p4', 
+            title_uz: 'Ko\'k choy', 
+            title_ru: 'Зеленый чай', 
+            title_en: 'Green Tea', 
+            description_uz: 'Sarxil barglardan damlangan an\'anaviy milliy ko\'k choy.',
+            description_ru: 'Традиционный зеленый чай, заваренный из отборных листьев.',
+            description_en: 'Traditional green tea brewed from selected leaves.',
+            price: 5000, 
+            category: 'drinks', 
+            image_url: 'https://images.unsplash.com/photo-1597481499750-3e6b22637e12?q=80&w=600&auto=format&fit=crop' 
+          },
+          { 
+            id: 'p5', 
+            title_uz: 'Limonad', 
+            title_ru: 'Лимонад', 
+            title_en: 'Lemonade', 
+            description_uz: 'Limon va yalpiz qo\'shilgan tetiklashtiruvchi muzdek limonad.',
+            description_ru: 'Освежающий ледяной лимонад с добавлением лимона и мяты.',
+            description_en: 'Refreshing ice-cold lemonade with lemon and mint.',
+            price: 15000, 
+            category: 'drinks', 
+            image_url: 'https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?q=80&w=600&auto=format&fit=crop' 
+          },
+          { 
+            id: 'p6', 
+            title_uz: 'Medovik', 
+            title_ru: 'Медовик', 
+            title_en: 'Honey Cake', 
+            description_uz: 'Asalli yumshoq korjlar va mayin qaymoqli kremdan tayyorlangan shirinlik.',
+            description_ru: 'Нежный медовый торт с мягкими коржами и воздушным сметанным кремом.',
+            description_en: 'Soft honey cake layers filled with delicate sour cream.',
+            price: 20000, 
+            category: 'dessert', 
+            image_url: 'https://images.unsplash.com/photo-1606313564200-e75d5e30476c?q=80&w=600&auto=format&fit=crop' 
+          }
         ]);
       }
     } catch (e) {
@@ -883,10 +949,19 @@ function App() {
   };
 
   const getLocalizedTitle = (product) => {
+    if (!product) return '';
     const lang = i18n.language;
-    if (lang === 'ru') return product.title_ru;
-    if (lang === 'en') return product.title_en;
+    if (lang === 'ru') return product.title_ru || product.title_uz;
+    if (lang === 'en') return product.title_en || product.title_uz;
     return product.title_uz;
+  };
+
+  const getLocalizedDescription = (product) => {
+    if (!product) return '';
+    const lang = i18n.language;
+    if (lang === 'ru') return product.description_ru || product.description_uz || 'Блюдо приготовлено из высококачественных ингредиентов.';
+    if (lang === 'en') return product.description_en || product.description_uz || 'Prepared from premium and high-quality ingredients.';
+    return product.description_uz || 'Premium va sifatli masalliqlardan tayyorlangan taom.';
   };
 
   return (
@@ -993,7 +1068,7 @@ function App() {
                               <div className="relative w-20 h-20 rounded-xl overflow-hidden bg-dark-900 flex-shrink-0">
                                 <img 
                                   src={prod.image_url || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?q=80&w=200&auto=format&fit=crop'} 
-                                  alt={prod.title_uz}
+                                  alt={getLocalizedTitle(prod)}
                                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                                 />
                               </div>
@@ -1003,7 +1078,7 @@ function App() {
                                     {getLocalizedTitle(prod)}
                                   </h3>
                                   <p className="text-[10px] text-zinc-400 mt-1 line-clamp-2 leading-relaxed">
-                                    {prod.description_uz || 'Premium va sifatli masalliqlardan tayyorlangan taom.'}
+                                    {getLocalizedDescription(prod)}
                                   </p>
                                 </div>
                                 <div className="flex items-center justify-between mt-2 pt-1 border-t border-white/5">
@@ -1711,7 +1786,9 @@ function App() {
                             const matchesQuery = (p.title_uz || '').toLowerCase().includes(q) ||
                                                  (p.title_ru || '').toLowerCase().includes(q) ||
                                                  (p.title_en || '').toLowerCase().includes(q) ||
-                                                 (p.description_uz || '').toLowerCase().includes(q);
+                                                 (p.description_uz || '').toLowerCase().includes(q) ||
+                                                 (p.description_ru || '').toLowerCase().includes(q) ||
+                                                 (p.description_en || '').toLowerCase().includes(q);
                             const matchesCategory = adminCategoryFilter === 'all' || p.category === adminCategoryFilter;
                             return matchesQuery && matchesCategory;
                           }).length === 0 ? (
@@ -1723,7 +1800,9 @@ function App() {
                                 const matchesQuery = (p.title_uz || '').toLowerCase().includes(q) ||
                                                      (p.title_ru || '').toLowerCase().includes(q) ||
                                                      (p.title_en || '').toLowerCase().includes(q) ||
-                                                     (p.description_uz || '').toLowerCase().includes(q);
+                                                     (p.description_uz || '').toLowerCase().includes(q) ||
+                                                     (p.description_ru || '').toLowerCase().includes(q) ||
+                                                     (p.description_en || '').toLowerCase().includes(q);
                                 const matchesCategory = adminCategoryFilter === 'all' || p.category === adminCategoryFilter;
                                 return matchesQuery && matchesCategory;
                               })
