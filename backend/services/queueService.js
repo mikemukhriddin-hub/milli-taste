@@ -73,17 +73,17 @@ async function getQueuePosition(orderId) {
       throw targetError || new Error('Order not found');
     }
 
-    // If order is ready, in transit, completed, or cancelled, its position is 0
-    if (['ready_for_pickup', 'in_transit', 'completed', 'cancelled'].includes(targetOrder.status)) {
+    // If order is completed or cancelled, its position is 0
+    if (['completed', 'cancelled'].includes(targetOrder.status)) {
       return { position: 0, estimatedTime: 0, status: targetOrder.status };
     }
 
-    // 2. Count how many orders with 'pending' or 'preparing' status were created BEFORE or AT the same time
+    // 2. Count how many orders with 'pending' or 'accepted' status were created BEFORE or AT the same time
     // using FIFO (First In, First Out)
     const { data: activeOrders, error: queueError } = await supabase
       .from('orders')
       .select('id')
-      .in('status', ['pending', 'preparing'])
+      .in('status', ['pending', 'accepted'])
       .order('created_at', { ascending: true });
 
     if (queueError) throw queueError;

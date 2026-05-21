@@ -66,7 +66,7 @@ function App() {
   const [simulationResult, setSimulationResult] = useState(null);
   const [isSimulating, setIsSimulating] = useState(false);
   const [adminSubTab, setAdminSubTab] = useState('orders'); // 'orders', 'bookings', 'menu'
-  const [adminOrderFilter, setAdminOrderFilter] = useState('active'); // 'all', 'active', 'ready', 'completed'
+  const [adminOrderFilter, setAdminOrderFilter] = useState('pending'); // 'pending', 'accepted', 'history'
   const [productFormOpen, setProductFormOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
   
@@ -220,8 +220,8 @@ function App() {
           const ordersData = await ordersRes.json();
           setMyOrders(ordersData);
           
-          // If there is an active order (pending/preparing/ready/transit), poll/track queue
-          const active = ordersData.find(o => ['pending', 'preparing', 'ready_for_pickup', 'in_transit'].includes(o.status));
+          // If there is an active order (pending/accepted), poll/track queue
+          const active = ordersData.find(o => ['pending', 'accepted'].includes(o.status));
           if (active) {
             fetchQueueStatus(active.id, initData);
           }
@@ -351,7 +351,7 @@ function App() {
         setMyOrders(prev => prev.map(o => o.id === payload.new.id ? { ...o, status: payload.new.status } : o));
         
         // If it's the user's active tracked order, update status/queue
-        const trackedOrderId = activeOrderQueue?.orderId || myOrders.find(o => ['pending', 'preparing', 'ready_for_pickup', 'in_transit'].includes(o.status))?.id;
+        const trackedOrderId = activeOrderQueue?.orderId || myOrders.find(o => ['pending', 'accepted'].includes(o.status))?.id;
         if (trackedOrderId && payload.new.id === trackedOrderId) {
           fetchQueueStatus(trackedOrderId);
         }
@@ -373,19 +373,10 @@ function App() {
     if (!isDemo && isSupabaseConfigured) return;
 
     const interval = setInterval(() => {
-      const active = myOrders.find(o => ['pending', 'preparing', 'ready_for_pickup', 'in_transit'].includes(o.status));
+      const active = myOrders.find(o => ['pending', 'accepted'].includes(o.status));
       if (active) {
         if (isDemo) {
           const currentOrder = myOrders.find(o => o.id === active.id) || active;
-          if (['ready_for_pickup', 'in_transit'].includes(currentOrder.status)) {
-            setActiveOrderQueue({
-              position: 0,
-              estimatedTime: 0,
-              status: currentOrder.status,
-              orderId: currentOrder.id
-            });
-            return;
-          }
 
           // Simulate simple queue movement in Demo mode
           setActiveOrderQueue(prev => {
@@ -396,10 +387,10 @@ function App() {
             // Transition status
             let newStatus = prev.status;
             if (newPos === 1 && prev.status === 'pending') {
-              newStatus = 'preparing';
+              newStatus = 'accepted';
               // sync to mock DB
-              setMyOrders(prevOrders => prevOrders.map(o => o.id === currentOrder.id ? { ...o, status: 'preparing' } : o));
-              setAdminOrders(prevOrders => prevOrders.map(o => o.id === currentOrder.id ? { ...o, status: 'preparing' } : o));
+              setMyOrders(prevOrders => prevOrders.map(o => o.id === currentOrder.id ? { ...o, status: 'accepted' } : o));
+              setAdminOrders(prevOrders => prevOrders.map(o => o.id === currentOrder.id ? { ...o, status: 'accepted' } : o));
             }
             return {
               position: newPos,
@@ -632,7 +623,7 @@ function App() {
         id: 'o_mock_2',
         queue_number: 2,
         total_price: 53000,
-        status: 'preparing',
+        status: 'accepted',
         order_type: 'pickup',
         address: '',
         created_at: new Date(Date.now() - 1800000).toISOString(),
@@ -710,14 +701,13 @@ function App() {
 
   const getFilteredAdminOrders = () => {
     return adminOrders.filter(order => {
-      if (adminOrderFilter === 'all') return true;
-      if (adminOrderFilter === 'active') {
-        return ['pending', 'preparing', 'in_transit'].includes(order.status);
+      if (adminOrderFilter === 'pending') {
+        return order.status === 'pending';
       }
-      if (adminOrderFilter === 'ready') {
-        return order.status === 'ready_for_pickup';
+      if (adminOrderFilter === 'accepted') {
+        return order.status === 'accepted';
       }
-      if (adminOrderFilter === 'completed') {
+      if (adminOrderFilter === 'history') {
         return ['completed', 'cancelled'].includes(order.status);
       }
       return true;
@@ -726,14 +716,13 @@ function App() {
 
   const getAdminOrdersCount = (filter) => {
     return adminOrders.filter(order => {
-      if (filter === 'all') return true;
-      if (filter === 'active') {
-        return ['pending', 'preparing', 'in_transit'].includes(order.status);
+      if (filter === 'pending') {
+        return order.status === 'pending';
       }
-      if (filter === 'ready') {
-        return order.status === 'ready_for_pickup';
+      if (filter === 'accepted') {
+        return order.status === 'accepted';
       }
-      if (filter === 'completed') {
+      if (filter === 'history') {
         return ['completed', 'cancelled'].includes(order.status);
       }
       return true;
@@ -1428,26 +1417,36 @@ function App() {
                     </div>
 
                     {/* FIFO visual queues */}
-                    {activeOrderQueue.status === 'ready_for_pickup' ? (
-                      <div className="py-6 flex flex-col items-center justify-center text-center space-y-3 animate-fade-in">
-                        <div className="w-16 h-16 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-400 flex items-center justify-center animate-bounce shadow-lg shadow-amber-500/10">
-                          <ShoppingBag className="w-8 h-8" />
-                        </div>
-                        <h4 className="text-sm font-extrabold text-amber-400">Taomingiz tayyor!</h4>
-                        <p className="text-xs text-zinc-300 max-w-[240px]">
-                          Taomingiz pishirildi va qadoqlandi. Uni restorandan olib ketishingiz mumkin!
-                        </p>
-                      </div>
-                    ) : activeOrderQueue.status === 'in_transit' ? (
-                      <div className="py-6 flex flex-col items-center justify-center text-center space-y-3 animate-fade-in">
-                        <div className="w-16 h-16 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 flex items-center justify-center animate-pulse shadow-lg shadow-emerald-500/10">
-                          <Truck className="w-8 h-8" />
-                        </div>
-                        <h4 className="text-sm font-extrabold text-emerald-400 font-display">Kuryer yo'lda!</h4>
-                        <p className="text-xs text-zinc-300 max-w-[240px]">
-                          Kuryer taomingizni olib manzilingiz tomon yo'lga chiqdi. Tez orada yetib boradi!
-                        </p>
-                      </div>
+                    {activeOrderQueue.status === 'accepted' ? (
+                      (() => {
+                        const activeOrderInfo = myOrders.find(o => o.id === activeOrderQueue.orderId);
+                        const isPickup = activeOrderInfo ? activeOrderInfo.order_type === 'pickup' : false;
+                        return (
+                          <div className="py-6 flex flex-col items-center justify-center text-center space-y-3 animate-fade-in">
+                            <div className={`w-16 h-16 rounded-full flex items-center justify-center animate-bounce shadow-lg ${
+                              isPickup 
+                                ? 'bg-amber-500/15 border border-amber-500/30 text-amber-400 shadow-amber-500/10' 
+                                : 'bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 shadow-emerald-500/10'
+                            }`}>
+                              {isPickup ? <ShoppingBag className="w-8 h-8" /> : <Truck className="w-8 h-8" />}
+                            </div>
+                            <h4 className={`text-sm font-extrabold ${isPickup ? 'text-amber-400' : 'text-emerald-400'}`}>
+                              {isPickup ? "Buyurtmangiz tayyorlanmoqda!" : "Buyurtmangiz yo'lda!"}
+                            </h4>
+                            <p className="text-xs text-zinc-300 max-w-[240px] pb-2">
+                              {isPickup 
+                                ? "Buyurtmangiz qabul qilindi. Oshxonada pishirilmoqda, tayyor bo'lgach restorandan olib ketishingiz mumkin!" 
+                                : "Buyurtmangiz qabul qilindi va tayyorlanmoqda/yo'lda. Kuryerimiz tez orada manzilingizga yetkazib beradi!"}
+                            </p>
+                            {activeOrderQueue.position > 0 && (
+                              <div className="pt-2 border-t border-white/5 w-full">
+                                <span className="text-[10px] text-zinc-400 uppercase tracking-wider block">Navbatdagi o'rni</span>
+                                <span className="text-base font-black text-brand-400">#{activeOrderQueue.position}</span>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()
                     ) : (
                       <>
                         <div className="py-5 flex flex-col items-center justify-center">
@@ -1497,11 +1496,11 @@ function App() {
                       <div 
                         key={order.id} 
                         onClick={() => {
-                          if (['pending', 'preparing', 'ready_for_pickup', 'in_transit'].includes(order.status)) {
+                          if (['pending', 'accepted'].includes(order.status)) {
                             if (isDemo) {
                               setActiveOrderQueue({
-                                position: ['ready_for_pickup', 'in_transit'].includes(order.status) ? 0 : 3,
-                                estimatedTime: ['ready_for_pickup', 'in_transit'].includes(order.status) ? 0 : 45,
+                                position: 3,
+                                estimatedTime: 45,
                                 status: order.status,
                                 orderId: order.id
                               });
@@ -1517,11 +1516,10 @@ function App() {
                             Buyurtma #{order.queue_number}
                           </span>
                           <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase ${
-                            order.status === 'completed' || order.status === 'delivered' ? 'bg-emerald-500/20 text-emerald-400' :
+                            order.status === 'completed' ? 'bg-emerald-500/20 text-emerald-400' :
                             order.status === 'cancelled' ? 'bg-rose-500/20 text-rose-400' :
                             order.status === 'pending' ? 'bg-blue-500/20 text-blue-400' :
-                            order.status === 'preparing' ? 'bg-amber-500/20 text-amber-400' :
-                            order.status === 'ready_for_pickup' ? 'bg-orange-500/20 text-orange-400' :
+                            order.status === 'accepted' ? 'bg-amber-500/20 text-amber-400' :
                             'bg-purple-500/20 text-purple-400'
                           }`}>
                             {t(`status_${order.status}`)}
@@ -1731,10 +1729,9 @@ function App() {
                           {/* Premium Tab switcher */}
                           <div className="flex gap-1.5 p-1 bg-dark-950/80 rounded-xl border border-white/5 overflow-x-auto scrollbar-none shadow-inner">
                             {[
-                              { id: 'all', label: 'Hamma', count: getAdminOrdersCount('all') },
-                              { id: 'active', label: 'Aktiv', count: getAdminOrdersCount('active') },
-                              { id: 'ready', label: 'Olib ketishga tayyor', count: getAdminOrdersCount('ready') },
-                              { id: 'completed', label: 'Yakunlanganlar', count: getAdminOrdersCount('completed') }
+                              { id: 'pending', label: 'Qabul qilish', count: getAdminOrdersCount('pending') },
+                              { id: 'accepted', label: 'Yakunlash', count: getAdminOrdersCount('accepted') },
+                              { id: 'history', label: 'Tarix', count: getAdminOrdersCount('history') }
                             ].map(tab => (
                               <button
                                 key={tab.id}
@@ -1785,11 +1782,10 @@ function App() {
                                     </div>
                                     <div className="flex items-center gap-2">
                                       <span className={`text-[9px] px-2 py-0.5 rounded-full font-bold uppercase ${
-                                        order.status === 'completed' || order.status === 'delivered' ? 'bg-emerald-500/20 text-emerald-400' :
+                                        order.status === 'completed' ? 'bg-emerald-500/20 text-emerald-400' :
                                         order.status === 'cancelled' ? 'bg-rose-500/20 text-rose-400' :
                                         order.status === 'pending' ? 'bg-blue-500/20 text-blue-400' :
-                                        order.status === 'preparing' ? 'bg-amber-500/20 text-amber-400' :
-                                        order.status === 'ready_for_pickup' ? 'bg-orange-500/20 text-orange-400' :
+                                        order.status === 'accepted' ? 'bg-amber-500/20 text-amber-400' :
                                         'bg-purple-500/20 text-purple-400'
                                       }`}>
                                         {t(`status_${order.status}`)}
@@ -1811,10 +1807,9 @@ function App() {
 
                                   {/* Dynamic Workflow action buttons */}
                                   {(() => {
-                                    const isPickup = order.order_type === 'pickup';
                                     const s = order.status;
 
-                                    if (s === 'completed' || s === 'cancelled' || s === 'delivered') {
+                                    if (s === 'completed' || s === 'cancelled') {
                                       return null;
                                     }
 
@@ -1823,46 +1818,19 @@ function App() {
                                         <div className="flex gap-2">
                                           {s === 'pending' && (
                                             <button
-                                              onClick={() => updateOrderStatus(order.id, 'preparing')}
-                                              className="bg-blue-600 hover:bg-blue-500 text-white font-bold text-[9px] px-2.5 py-1.5 rounded uppercase tracking-wider transition-all"
+                                              onClick={() => updateOrderStatus(order.id, 'accepted')}
+                                              className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[9px] px-2.5 py-1.5 rounded uppercase tracking-wider transition-all"
                                             >
                                               Qabul qilish
                                             </button>
                                           )}
                                           
-                                          {s === 'preparing' && (
-                                            isPickup ? (
-                                              <button
-                                                onClick={() => updateOrderStatus(order.id, 'ready_for_pickup')}
-                                                className="bg-amber-500 hover:bg-amber-400 text-dark-950 font-bold text-[9px] px-2.5 py-1.5 rounded uppercase tracking-wider transition-all"
-                                              >
-                                                Tayyor
-                                              </button>
-                                            ) : (
-                                              <button
-                                                onClick={() => updateOrderStatus(order.id, 'in_transit')}
-                                                className="bg-orange-500 hover:bg-orange-400 text-white font-bold text-[9px] px-2.5 py-1.5 rounded uppercase tracking-wider transition-all"
-                                              >
-                                                Yo'lga chiqdi
-                                              </button>
-                                            )
-                                          )}
-
-                                          {s === 'ready_for_pickup' && (
+                                          {s === 'accepted' && (
                                             <button
                                               onClick={() => updateOrderStatus(order.id, 'completed')}
-                                              className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[9px] px-2.5 py-1.5 rounded uppercase tracking-wider transition-all"
+                                              className="bg-blue-600 hover:bg-blue-500 text-white font-bold text-[9px] px-2.5 py-1.5 rounded uppercase tracking-wider transition-all"
                                             >
-                                              Topshirildi (Yakunlash)
-                                            </button>
-                                          )}
-
-                                          {s === 'in_transit' && (
-                                            <button
-                                              onClick={() => updateOrderStatus(order.id, 'completed')}
-                                              className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[9px] px-2.5 py-1.5 rounded uppercase tracking-wider transition-all"
-                                            >
-                                              Yetkazildi (Yakunlash)
+                                              Yakunlash
                                             </button>
                                           )}
                                         </div>
@@ -2384,7 +2352,7 @@ function App() {
           }`}
         >
           <Clock className="w-4.5 h-4.5" />
-          {myOrders.some(o => ['pending', 'preparing', 'ready_for_pickup', 'in_transit'].includes(o.status)) && (
+          {myOrders.some(o => ['pending', 'accepted'].includes(o.status)) && (
             <span className="absolute top-0 right-1 w-2 h-2 bg-brand-500 rounded-full animate-ping" />
           )}
           <span className="text-[9px] tracking-tight">{t('orders')}</span>
