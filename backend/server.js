@@ -20,9 +20,39 @@ app.use((req, res, next) => {
   next();
 });
 
-// ----------------------------------------------------
-// 1. AUTHENTICATION & USER MANAGEMENT
-// ----------------------------------------------------
+// Helper to find or auto-register a Telegram user
+async function findOrCreateUser(tgUser) {
+  if (!tgUser || !tgUser.id) return null;
+
+  let { data: user, error: fetchError } = await supabase
+    .from('users')
+    .select('*')
+    .eq('telegram_id', tgUser.id)
+    .single();
+
+  if (fetchError && fetchError.code !== 'PGRST116') {
+    throw fetchError;
+  }
+
+  if (!user) {
+    const name = `${tgUser.first_name || ''} ${tgUser.last_name || ''}`.trim() || tgUser.username || 'Foydalanuvchi';
+    const { data: newUser, error: createError } = await supabase
+      .from('users')
+      .insert({
+        telegram_id: tgUser.id,
+        name: name,
+        phone: tgUser.phone || '',
+        role: 'client'
+      })
+      .select()
+      .single();
+
+    if (createError) throw createError;
+    console.log(`🆕 Auto-registered missing user in session: ${name} (TG: ${tgUser.id})`);
+    return newUser;
+  }
+  return user;
+}
 
 /**
  * Automatically registers or logs in a user from Telegram Mini App
@@ -34,38 +64,8 @@ app.post('/api/auth/telegram', validateTelegramRequest, async (req, res) => {
       return res.status(400).json({ error: 'Telegram user details missing' });
     }
 
-    // Check if user exists in the database
-    let { data: user, error: fetchError } = await supabase
-      .from('users')
-      .select('*')
-      .eq('telegram_id', tgUser.id)
-      .single();
-
-    if (fetchError && fetchError.code !== 'PGRST116') { // PGRST116 is "no rows found"
-      throw fetchError;
-    }
-
-    if (!user) {
-      // Create user if not exists
-      const name = `${tgUser.first_name || ''} ${tgUser.last_name || ''}`.trim() || tgUser.username || 'Foydalanuvchi';
-      
-      const { data: newUser, error: createError } = await supabase
-        .from('users')
-        .insert({
-          telegram_id: tgUser.id,
-          name: name,
-          phone: tgUser.phone || '', // Can be updated later
-          role: 'client'
-        })
-        .select()
-        .single();
-
-      if (createError) throw createError;
-      user = newUser;
-      console.log(`🆕 New user registered: ${name} (TG: ${tgUser.id})`);
-    } else {
-      console.log(`👋 User logged in: ${user.name} (TG: ${tgUser.id})`);
-    }
+    const user = await findOrCreateUser(tgUser);
+    console.log(`👋 User logged in: ${user.name} (TG: ${tgUser.id})`);
 
     res.json({ user });
   } catch (err) {
@@ -140,14 +140,9 @@ app.post('/api/orders', validateTelegramRequest, async (req, res) => {
       return res.status(400).json({ error: 'Order type is required' });
     }
 
-    // 1. Find user db UUID
-    const { data: user, error: userError } = await supabase
-      .from('users')
-      .select('id, phone')
-      .eq('telegram_id', tgUser.id)
-      .single();
-
-    if (userError || !user) {
+    // 1. Find user db UUID (or auto-register if missing)
+    const user = await findOrCreateUser(tgUser);
+    if (!user) {
       return res.status(404).json({ error: 'User not registered in system' });
     }
 
@@ -231,13 +226,8 @@ app.get('/api/orders/my', validateTelegramRequest, async (req, res) => {
   try {
     const tgUser = req.telegramUser;
 
-    const { data: user, error: userError } = await supabase
-      .from('users')
-      .select('id')
-      .eq('telegram_id', tgUser.id)
-      .single();
-
-    if (userError || !user) return res.status(404).json({ error: 'User not found' });
+    const user = await findOrCreateUser(tgUser);
+    if (!user) return res.status(404).json({ error: 'User not found' });
 
     const { data: orders, error } = await supabase
       .from('orders')
@@ -292,13 +282,8 @@ app.post('/api/bookings', validateTelegramRequest, async (req, res) => {
       return res.status(400).json({ error: 'Table number, time, and guests count are required' });
     }
 
-    const { data: user, error: userError } = await supabase
-      .from('users')
-      .select('id')
-      .eq('telegram_id', tgUser.id)
-      .single();
-
-    if (userError || !user) return res.status(404).json({ error: 'User not found' });
+    const user = await findOrCreateUser(tgUser);
+    if (!user) return res.status(404).json({ error: 'User not found' });
 
     const { data: booking, error } = await supabase
       .from('bookings')
@@ -324,13 +309,8 @@ app.get('/api/bookings/my', validateTelegramRequest, async (req, res) => {
   try {
     const tgUser = req.telegramUser;
 
-    const { data: user, error: userError } = await supabase
-      .from('users')
-      .select('id')
-      .eq('telegram_id', tgUser.id)
-      .single();
-
-    if (userError || !user) return res.status(404).json({ error: 'User not found' });
+    const user = await findOrCreateUser(tgUser);
+    if (!user) return res.status(404).json({ error: 'User not found' });
 
     const { data: bookings, error } = await supabase
       .from('bookings')
