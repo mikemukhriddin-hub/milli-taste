@@ -1,0 +1,120 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap');
+
+@import "tailwindcss";
+
+@theme {
+  --color-brand-50: #fcf8f2;
+  --color-brand-100: #f7ecd9;
+  --color-brand-200: #eed7b2;
+  --color-brand-300: #e1b980;
+  --color-brand-400: #d39851;
+  --color-brand-500: #c5782f;
+  --color-brand-600: #b66125;
+  --color-brand-700: #974b20;
+  --color-brand-800: #7a3c1e;
+  --color-brand-900: #63331b;
+
+  --color-dark-50: #f6f6f6;
+  --color-dark-100: #e7e7e7;
+  --color-dark-200: #d1d1d1;
+  --color-dark-300: #b0b0b0;
+  --color-dark-400: #888888;
+  --color-dark-500: #6d6d6d;
+  --color-dark-600: #5d5d5d;
+  --color-dark-700: #4f4f4f;
+  --color-dark-800: #373737;
+  --color-dark-900: #222222;
+  --color-dark-950: #0f0f11;
+
+  --font-sans: 'Outfit', 'Inter', sans-serif;
+
+  --shadow-premium: 0 8px 30px rgb(0, 0, 0, 0.12);
+  --shadow-premium-hover: 0 12px 40px rgb(0, 0, 0, 0.2);
+  --shadow-glass: 0 8px 32px 0 rgba(31, 38, 135, 0.07);
+}
+
+@layer base {
+  body {
+    @apply bg-dark-950 text-white font-sans antialiased overflow-x-hidden selection:bg-brand-500 selection:text-white;
+  }
+}
+
+/* Glassmorphism utility */
+.glass {
+  background: rgba(30, 30, 35, 0.65);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.glass-card {
+  background: linear-gradient(135deg, rgba(35, 35, 45, 0.8) 0%, rgba(20, 20, 25, 0.8) 100%);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.glass-input {
+  background: rgba(15, 15, 20, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.glass-input:focus {
+  border-color: #c5782f; /* brand-500 */
+  box-shadow: 0 0 0 2px rgba(197, 120, 47, 0.2);
+  outline: none;
+}
+
+/* Premium Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #0f0f11;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #373737;
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #c5782f;
+}
+
+/* Micro-animations */
+@keyframes pulse-subtle {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.02); opacity: 0.95; }
+}
+
+.animate-pulse-subtle {
+  animation: pulse-subtle 3s infinite ease-in-out;
+}
+
+/* Telegram Mobile Layout lock */
+.tma-container {
+  max-width: 480px;
+  margin: 0 auto;
+  min-height: 100vh;
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
