@@ -18,7 +18,9 @@ import {
   RefreshCw,
   LogOut,
   Trash2,
-  Users
+  Users,
+  ShoppingBag,
+  Truck
 } from 'lucide-react';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
@@ -64,6 +66,7 @@ function App() {
   const [simulationResult, setSimulationResult] = useState(null);
   const [isSimulating, setIsSimulating] = useState(false);
   const [adminSubTab, setAdminSubTab] = useState('orders'); // 'orders', 'bookings', 'menu'
+  const [adminOrderFilter, setAdminOrderFilter] = useState('active'); // 'all', 'active', 'ready', 'completed'
   const [productFormOpen, setProductFormOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
   
@@ -217,8 +220,8 @@ function App() {
           const ordersData = await ordersRes.json();
           setMyOrders(ordersData);
           
-          // If there is an active order (pending/preparing), poll/track queue
-          const active = ordersData.find(o => ['pending', 'preparing'].includes(o.status));
+          // If there is an active order (pending/preparing/ready/transit), poll/track queue
+          const active = ordersData.find(o => ['pending', 'preparing', 'ready_for_pickup', 'in_transit'].includes(o.status));
           if (active) {
             fetchQueueStatus(active.id, initData);
           }
@@ -348,7 +351,7 @@ function App() {
         setMyOrders(prev => prev.map(o => o.id === payload.new.id ? { ...o, status: payload.new.status } : o));
         
         // If it's the user's active tracked order, update status/queue
-        const trackedOrderId = activeOrderQueue?.orderId || myOrders.find(o => ['pending', 'preparing'].includes(o.status))?.id;
+        const trackedOrderId = activeOrderQueue?.orderId || myOrders.find(o => ['pending', 'preparing', 'ready_for_pickup', 'in_transit'].includes(o.status))?.id;
         if (trackedOrderId && payload.new.id === trackedOrderId) {
           fetchQueueStatus(trackedOrderId);
         }
@@ -370,25 +373,46 @@ function App() {
     if (!isDemo && isSupabaseConfigured) return;
 
     const interval = setInterval(() => {
-      const active = myOrders.find(o => ['pending', 'preparing'].includes(o.status));
+      const active = myOrders.find(o => ['pending', 'preparing', 'ready_for_pickup', 'in_transit'].includes(o.status));
       if (active) {
         if (isDemo) {
+          const currentOrder = myOrders.find(o => o.id === active.id) || active;
+          if (['ready_for_pickup', 'in_transit'].includes(currentOrder.status)) {
+            setActiveOrderQueue({
+              position: 0,
+              estimatedTime: 0,
+              status: currentOrder.status,
+              orderId: currentOrder.id
+            });
+            return;
+          }
+
           // Simulate simple queue movement in Demo mode
           setActiveOrderQueue(prev => {
-            if (!prev) return { position: 3, estimatedTime: 45, status: 'pending' };
+            if (!prev || prev.orderId !== currentOrder.id) {
+              return { position: 3, estimatedTime: 45, status: currentOrder.status, orderId: currentOrder.id };
+            }
             const newPos = Math.max(1, prev.position - (Math.random() > 0.6 ? 1 : 0));
             // Transition status
             let newStatus = prev.status;
-            if (newPos === 1 && prev.status === 'pending') newStatus = 'preparing';
+            if (newPos === 1 && prev.status === 'pending') {
+              newStatus = 'preparing';
+              // sync to mock DB
+              setMyOrders(prevOrders => prevOrders.map(o => o.id === currentOrder.id ? { ...o, status: 'preparing' } : o));
+              setAdminOrders(prevOrders => prevOrders.map(o => o.id === currentOrder.id ? { ...o, status: 'preparing' } : o));
+            }
             return {
               position: newPos,
               estimatedTime: newPos * 15,
-              status: newStatus
+              status: newStatus,
+              orderId: currentOrder.id
             };
           });
         } else {
           fetchQueueStatus(active.id);
         }
+      } else {
+        setActiveOrderQueue(null);
       }
     }, 6000); // Poll every 6s
 
@@ -682,6 +706,38 @@ function App() {
     } catch (err) {
       console.error(err);
     }
+  };
+
+  const getFilteredAdminOrders = () => {
+    return adminOrders.filter(order => {
+      if (adminOrderFilter === 'all') return true;
+      if (adminOrderFilter === 'active') {
+        return ['pending', 'preparing', 'in_transit'].includes(order.status);
+      }
+      if (adminOrderFilter === 'ready') {
+        return order.status === 'ready_for_pickup';
+      }
+      if (adminOrderFilter === 'completed') {
+        return ['completed', 'cancelled'].includes(order.status);
+      }
+      return true;
+    });
+  };
+
+  const getAdminOrdersCount = (filter) => {
+    return adminOrders.filter(order => {
+      if (filter === 'all') return true;
+      if (filter === 'active') {
+        return ['pending', 'preparing', 'in_transit'].includes(order.status);
+      }
+      if (filter === 'ready') {
+        return order.status === 'ready_for_pickup';
+      }
+      if (filter === 'completed') {
+        return ['completed', 'cancelled'].includes(order.status);
+      }
+      return true;
+    }).length;
   };
 
   const updateBookingStatus = async (bookingId, newStatus) => {
@@ -1372,35 +1428,59 @@ function App() {
                     </div>
 
                     {/* FIFO visual queues */}
-                    <div className="py-5 flex flex-col items-center justify-center">
-                      <div className="text-5xl font-black text-brand-400 tracking-tight flex items-end">
-                        #{activeOrderQueue.position}
-                        <span className="text-xs text-zinc-400 ml-1 mb-2">/ navbat</span>
-                      </div>
-                      <p className="text-xs text-zinc-300 mt-2 font-medium">
-                        {t('queue_position_text', { position: activeOrderQueue.position })}
-                      </p>
-
-                      <div className="w-full bg-dark-900 rounded-full h-1.5 mt-5 overflow-hidden">
-                        <div 
-                          className="bg-brand-500 h-1.5 rounded-full transition-all duration-1000"
-                          style={{ width: `${Math.max(10, 100 - (activeOrderQueue.position * 15))}%` }}
-                        />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4 pt-3.5 border-t border-white/5 text-center">
-                      <div>
-                        <p className="text-[10px] text-zinc-400">{t('queue_wait_time')}</p>
-                        <p className="text-sm font-bold text-zinc-100 mt-0.5">
-                          ~ {t('queue_wait_time_text', { time: activeOrderQueue.estimatedTime })}
+                    {activeOrderQueue.status === 'ready_for_pickup' ? (
+                      <div className="py-6 flex flex-col items-center justify-center text-center space-y-3 animate-fade-in">
+                        <div className="w-16 h-16 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-400 flex items-center justify-center animate-bounce shadow-lg shadow-amber-500/10">
+                          <ShoppingBag className="w-8 h-8" />
+                        </div>
+                        <h4 className="text-sm font-extrabold text-amber-400">Taomingiz tayyor!</h4>
+                        <p className="text-xs text-zinc-300 max-w-[240px]">
+                          Taomingiz pishirildi va qadoqlandi. Uni restorandan olib ketishingiz mumkin!
                         </p>
                       </div>
-                      <div>
-                        <p className="text-[10px] text-zinc-400">Restoran yuklamasi</p>
-                        <p className="text-sm font-bold text-amber-400 mt-0.5">Yuqori (High Load)</p>
+                    ) : activeOrderQueue.status === 'in_transit' ? (
+                      <div className="py-6 flex flex-col items-center justify-center text-center space-y-3 animate-fade-in">
+                        <div className="w-16 h-16 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 flex items-center justify-center animate-pulse shadow-lg shadow-emerald-500/10">
+                          <Truck className="w-8 h-8" />
+                        </div>
+                        <h4 className="text-sm font-extrabold text-emerald-400 font-display">Kuryer yo'lda!</h4>
+                        <p className="text-xs text-zinc-300 max-w-[240px]">
+                          Kuryer taomingizni olib manzilingiz tomon yo'lga chiqdi. Tez orada yetib boradi!
+                        </p>
                       </div>
-                    </div>
+                    ) : (
+                      <>
+                        <div className="py-5 flex flex-col items-center justify-center">
+                          <div className="text-5xl font-black text-brand-400 tracking-tight flex items-end">
+                            #{activeOrderQueue.position}
+                            <span className="text-xs text-zinc-400 ml-1 mb-2">/ navbat</span>
+                          </div>
+                          <p className="text-xs text-zinc-300 mt-2 font-medium">
+                            {t('queue_position_text', { position: activeOrderQueue.position })}
+                          </p>
+
+                          <div className="w-full bg-dark-900 rounded-full h-1.5 mt-5 overflow-hidden">
+                            <div 
+                              className="bg-brand-500 h-1.5 rounded-full transition-all duration-1000"
+                              style={{ width: `${Math.max(10, 100 - (activeOrderQueue.position * 15))}%` }}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4 pt-3.5 border-t border-white/5 text-center">
+                          <div>
+                            <p className="text-[10px] text-zinc-400">{t('queue_wait_time')}</p>
+                            <p className="text-sm font-bold text-zinc-100 mt-0.5">
+                              ~ {t('queue_wait_time_text', { time: activeOrderQueue.estimatedTime })}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-[10px] text-zinc-400">Restoran yuklamasi</p>
+                            <p className="text-sm font-bold text-amber-400 mt-0.5">Yuqori (High Load)</p>
+                          </div>
+                        </div>
+                      </>
+                    )}
                   </div>
                 )}
 
@@ -1417,8 +1497,17 @@ function App() {
                       <div 
                         key={order.id} 
                         onClick={() => {
-                          if (['pending', 'preparing'].includes(order.status)) {
-                            fetchQueueStatus(order.id);
+                          if (['pending', 'preparing', 'ready_for_pickup', 'in_transit'].includes(order.status)) {
+                            if (isDemo) {
+                              setActiveOrderQueue({
+                                position: ['ready_for_pickup', 'in_transit'].includes(order.status) ? 0 : 3,
+                                estimatedTime: ['ready_for_pickup', 'in_transit'].includes(order.status) ? 0 : 45,
+                                status: order.status,
+                                orderId: order.id
+                              });
+                            } else {
+                              fetchQueueStatus(order.id);
+                            }
                           }
                         }}
                         className="glass-card p-4 rounded-xl border border-white/5 shadow-sm space-y-2.5 cursor-pointer hover:border-brand-500/25 transition-all"
@@ -1428,9 +1517,12 @@ function App() {
                             Buyurtma #{order.queue_number}
                           </span>
                           <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase ${
-                            order.status === 'delivered' ? 'bg-emerald-500/20 text-emerald-400' :
+                            order.status === 'completed' || order.status === 'delivered' ? 'bg-emerald-500/20 text-emerald-400' :
                             order.status === 'cancelled' ? 'bg-rose-500/20 text-rose-400' :
-                            order.status === 'preparing' ? 'bg-blue-500/20 text-blue-400' : 'bg-amber-500/20 text-amber-400'
+                            order.status === 'pending' ? 'bg-blue-500/20 text-blue-400' :
+                            order.status === 'preparing' ? 'bg-amber-500/20 text-amber-400' :
+                            order.status === 'ready_for_pickup' ? 'bg-orange-500/20 text-orange-400' :
+                            'bg-purple-500/20 text-purple-400'
                           }`}>
                             {t(`status_${order.status}`)}
                           </span>
@@ -1625,29 +1717,85 @@ function App() {
                         </div>
 
                         {/* Active Order Stream monitor */}
-                        <div className="space-y-2.5">
+                        <div className="space-y-4">
                           <div className="flex justify-between items-center">
                             <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Buyurtmalar Monitori</h3>
                             <button 
                               onClick={() => isDemo ? generateMockAdminData() : fetchAdminOrders()}
-                              className="text-[10px] text-zinc-400 hover:text-white flex items-center gap-1"
+                              className="text-[10px] text-zinc-400 hover:text-white flex items-center gap-1 transition-colors"
                             >
                               <RefreshCw className="w-3 h-3" /> Yangilash
                             </button>
                           </div>
 
-                          {adminOrders.length === 0 ? (
-                            <p className="text-xs text-zinc-500 text-center py-4">Faol buyurtmalar mavjud emas.</p>
+                          {/* Premium Tab switcher */}
+                          <div className="flex gap-1.5 p-1 bg-dark-950/80 rounded-xl border border-white/5 overflow-x-auto scrollbar-none shadow-inner">
+                            {[
+                              { id: 'all', label: 'Hamma', count: getAdminOrdersCount('all') },
+                              { id: 'active', label: 'Aktiv', count: getAdminOrdersCount('active') },
+                              { id: 'ready', label: 'Olib ketishga tayyor', count: getAdminOrdersCount('ready') },
+                              { id: 'completed', label: 'Yakunlanganlar', count: getAdminOrdersCount('completed') }
+                            ].map(tab => (
+                              <button
+                                key={tab.id}
+                                onClick={() => setAdminOrderFilter(tab.id)}
+                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-extrabold uppercase whitespace-nowrap transition-all ${
+                                  adminOrderFilter === tab.id
+                                    ? 'bg-rose-600 text-white shadow-sm scale-102'
+                                    : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/5'
+                                }`}
+                              >
+                                {tab.label}
+                                <span className={`px-1.5 py-0.5 rounded-full text-[9px] font-black ${
+                                  adminOrderFilter === tab.id
+                                    ? 'bg-rose-800 text-rose-100'
+                                    : 'bg-dark-900 text-zinc-400'
+                                }`}>
+                                  {tab.count}
+                                </span>
+                              </button>
+                            ))}
+                          </div>
+
+                          {getFilteredAdminOrders().length === 0 ? (
+                            <p className="text-xs text-zinc-500 text-center py-6 glass-card rounded-xl border border-white/5">
+                              Ushbu bo'limda buyurtmalar mavjud emas.
+                            </p>
                           ) : (
                             <div className="space-y-3">
-                              {adminOrders.map(order => (
-                                <div key={order.id} className="glass-card p-3 rounded-xl border border-white/5 space-y-2 text-xs">
+                              {getFilteredAdminOrders().map(order => (
+                                <div 
+                                  key={order.id} 
+                                  className={`glass-card p-3.5 rounded-xl border space-y-2.5 text-xs transition-all border-l-4 ${
+                                    order.order_type === 'pickup' 
+                                      ? 'border-white/5 border-l-amber-500 bg-amber-500/[0.02] hover:bg-amber-500/[0.04]' 
+                                      : 'border-white/5 border-l-orange-500 bg-orange-500/[0.02] hover:bg-orange-500/[0.04]'
+                                  }`}
+                                >
                                   <div className="flex justify-between items-center pb-2 border-b border-white/5">
-                                    <div>
-                                      <span className="font-bold text-zinc-200">Navbat #{order.queue_number}</span>
-                                      <span className="text-[10px] text-zinc-400 ml-2 capitalize">({order.order_type})</span>
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-extrabold text-zinc-200 text-xs">Navbat #{order.queue_number}</span>
+                                      <span className={`text-[9px] px-1.5 py-0.5 rounded font-black uppercase tracking-wider ${
+                                        order.order_type === 'pickup'
+                                          ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                                          : 'bg-orange-500/10 text-orange-400 border border-orange-500/20'
+                                      }`}>
+                                        {order.order_type === 'pickup' ? 'Pick-up' : 'Delivery'}
+                                      </span>
                                     </div>
-                                    <span className="font-extrabold text-brand-400">{order.total_price.toLocaleString()} UZS</span>
+                                    <div className="flex items-center gap-2">
+                                      <span className={`text-[9px] px-2 py-0.5 rounded-full font-bold uppercase ${
+                                        order.status === 'completed' || order.status === 'delivered' ? 'bg-emerald-500/20 text-emerald-400' :
+                                        order.status === 'cancelled' ? 'bg-rose-500/20 text-rose-400' :
+                                        order.status === 'pending' ? 'bg-blue-500/20 text-blue-400' :
+                                        order.status === 'preparing' ? 'bg-amber-500/20 text-amber-400' :
+                                        order.status === 'ready_for_pickup' ? 'bg-orange-500/20 text-orange-400' :
+                                        'bg-purple-500/20 text-purple-400'
+                                      }`}>
+                                        {t(`status_${order.status}`)}
+                                      </span>
+                                      <span className="font-extrabold text-brand-400">{order.total_price.toLocaleString()} UZS</span>
+                                    </div>
                                   </div>
 
                                   <div className="text-zinc-400 text-[11px] space-y-1">
@@ -1661,28 +1809,73 @@ function App() {
                                     </ul>
                                   </div>
 
-                                  {/* Action buttons to update FIFO state */}
-                                  <div className="flex flex-wrap gap-1.5 pt-2 border-t border-white/5">
-                                    {['pending', 'preparing', 'shipping', 'delivered'].map((status) => (
-                                      <button
-                                        key={status}
-                                        onClick={() => updateOrderStatus(order.id, status)}
-                                        className={`text-[9px] px-2 py-1 rounded font-bold uppercase transition-all ${
-                                          order.status === status 
-                                            ? 'bg-brand-600 text-white shadow-sm' 
-                                            : 'bg-dark-900 text-zinc-400 hover:bg-dark-800'
-                                        }`}
-                                      >
-                                        {status}
-                                      </button>
-                                    ))}
-                                    <button
-                                      onClick={() => updateOrderStatus(order.id, 'cancelled')}
-                                      className="text-[9px] px-2 py-1 rounded font-bold uppercase bg-rose-950/20 text-rose-400 hover:bg-rose-950/40 ml-auto"
-                                    >
-                                      Bekor qilish
-                                    </button>
-                                  </div>
+                                  {/* Dynamic Workflow action buttons */}
+                                  {(() => {
+                                    const isPickup = order.order_type === 'pickup';
+                                    const s = order.status;
+
+                                    if (s === 'completed' || s === 'cancelled' || s === 'delivered') {
+                                      return null;
+                                    }
+
+                                    return (
+                                      <div className="flex justify-between items-center gap-2 w-full pt-2.5 border-t border-white/5">
+                                        <div className="flex gap-2">
+                                          {s === 'pending' && (
+                                            <button
+                                              onClick={() => updateOrderStatus(order.id, 'preparing')}
+                                              className="bg-blue-600 hover:bg-blue-500 text-white font-bold text-[9px] px-2.5 py-1.5 rounded uppercase tracking-wider transition-all"
+                                            >
+                                              Qabul qilish
+                                            </button>
+                                          )}
+                                          
+                                          {s === 'preparing' && (
+                                            isPickup ? (
+                                              <button
+                                                onClick={() => updateOrderStatus(order.id, 'ready_for_pickup')}
+                                                className="bg-amber-500 hover:bg-amber-400 text-dark-950 font-bold text-[9px] px-2.5 py-1.5 rounded uppercase tracking-wider transition-all"
+                                              >
+                                                Tayyor
+                                              </button>
+                                            ) : (
+                                              <button
+                                                onClick={() => updateOrderStatus(order.id, 'in_transit')}
+                                                className="bg-orange-500 hover:bg-orange-400 text-white font-bold text-[9px] px-2.5 py-1.5 rounded uppercase tracking-wider transition-all"
+                                              >
+                                                Yo'lga chiqdi
+                                              </button>
+                                            )
+                                          )}
+
+                                          {s === 'ready_for_pickup' && (
+                                            <button
+                                              onClick={() => updateOrderStatus(order.id, 'completed')}
+                                              className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[9px] px-2.5 py-1.5 rounded uppercase tracking-wider transition-all"
+                                            >
+                                              Topshirildi (Yakunlash)
+                                            </button>
+                                          )}
+
+                                          {s === 'in_transit' && (
+                                            <button
+                                              onClick={() => updateOrderStatus(order.id, 'completed')}
+                                              className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[9px] px-2.5 py-1.5 rounded uppercase tracking-wider transition-all"
+                                            >
+                                              Yetkazildi (Yakunlash)
+                                            </button>
+                                          )}
+                                        </div>
+
+                                        <button
+                                          onClick={() => updateOrderStatus(order.id, 'cancelled')}
+                                          className="bg-rose-950/20 hover:bg-rose-950/45 text-rose-400 border border-rose-500/20 font-bold text-[9px] px-2.5 py-1.5 rounded uppercase tracking-wider transition-all ml-auto"
+                                        >
+                                          Rad etish
+                                        </button>
+                                      </div>
+                                    );
+                                  })()}
                                 </div>
                               ))}
                             </div>
@@ -2191,7 +2384,7 @@ function App() {
           }`}
         >
           <Clock className="w-4.5 h-4.5" />
-          {myOrders.some(o => ['pending', 'preparing'].includes(o.status)) && (
+          {myOrders.some(o => ['pending', 'preparing', 'ready_for_pickup', 'in_transit'].includes(o.status)) && (
             <span className="absolute top-0 right-1 w-2 h-2 bg-brand-500 rounded-full animate-ping" />
           )}
           <span className="text-[9px] tracking-tight">{t('orders')}</span>

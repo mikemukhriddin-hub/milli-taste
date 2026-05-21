@@ -35,7 +35,7 @@ CREATE TABLE IF NOT EXISTS orders (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID REFERENCES users(id) ON DELETE CASCADE NOT NULL,
     total_price NUMERIC(10, 2) NOT NULL,
-    status VARCHAR(50) DEFAULT 'pending' CHECK (status IN ('pending', 'preparing', 'shipping', 'delivered', 'cancelled')),
+    status VARCHAR(50) DEFAULT 'pending' CHECK (status IN ('pending', 'preparing', 'ready_for_pickup', 'in_transit', 'completed', 'cancelled')),
     queue_number INTEGER NOT NULL,
     order_type VARCHAR(50) NOT NULL CHECK (order_type IN ('delivery', 'pickup')),
     address TEXT,

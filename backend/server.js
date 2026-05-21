@@ -452,7 +452,7 @@ app.put('/api/admin/orders/:id/status', validateTelegramRequest, async (req, res
     const orderId = req.params.id;
     const { status } = req.body; // 'preparing', 'shipping', 'delivered', 'cancelled'
 
-    if (!['pending', 'preparing', 'shipping', 'delivered', 'cancelled'].includes(status)) {
+    if (!['pending', 'preparing', 'ready_for_pickup', 'in_transit', 'completed', 'cancelled'].includes(status)) {
       return res.status(400).json({ error: 'Invalid status' });
     }
 

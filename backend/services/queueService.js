@@ -73,8 +73,8 @@ async function getQueuePosition(orderId) {
       throw targetError || new Error('Order not found');
     }
 
-    // If order is already shipped, delivered, or cancelled, its position is 0
-    if (['shipping', 'delivered', 'cancelled'].includes(targetOrder.status)) {
+    // If order is ready, in transit, completed, or cancelled, its position is 0
+    if (['ready_for_pickup', 'in_transit', 'completed', 'cancelled'].includes(targetOrder.status)) {
       return { position: 0, estimatedTime: 0, status: targetOrder.status };
     }
 
